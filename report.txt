@@ -1,0 +1,13 @@
+/* ---------------------------------------------------------------------
+   report.txt: report for comp2310 assignment 2, 2012
+     Name: 
+     Student Number: 
+
+***Disclaimer***: (modify as appropriate)
+  The work that I am submitting for this program is without significant       
+  contributions from others (excepting course staff).
+*/
+
+--------------------------------------------------------------------- */
+
+
