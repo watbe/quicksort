@@ -29,38 +29,156 @@
 #include "quicklib.h"
 #include "distquicklib.h"
 
+typedef int bool;
+#define true 1
+#define false 0
 
 // distributed quick sort using pipes
 void quickPipe(int A[], int n, int p) {
 
-  while(p >= 2) {
-    
+  //int fraction = p;
+  
+  bool hasParent = false;
+  
+  int childLength = 0;
+  int leftLength = 0;
+  int rightLength = 0;
+
+  int forkId = 0;
+  int fd_cp[2];
+  
+  int indicator;
+
+  int levels = lg2(p);
+
+  while(levels != 0) {
+
+    // Partition into two
+    int pivot = partition(A, n);
+
+    // split off right side 
+    leftLength = pivot + 1;
+    rightLength = n - leftLength;  
+    int right[rightLength];
+    memmove(right, &A[leftLength], sizeof(int) * rightLength);
+
+    // construct pipes
+    int status = pipe(fd_cp); if (status != 0) perror("pipe error: ");
+
+    // fork
+    printf("forked a new process\n");
+    forkId = fork();
+
+    // if it's the child, set A[] to the right side, length
+    // to the new length;
+    if(!forkId) {
+  
+      // flag that it has a parent because forkId gets overwritten
+      hasParent = true;
+      
+      //child
+      n = rightLength;
+      // make array smaller
+      A = malloc(rightLength * sizeof(int));
+      // copy into A
+      memmove(A, right, rightLength * sizeof(int));
+    } else {
+      // parent needs new length to tell it how much to sort.
+      // but array A can be the same (should maybe free()?).
+      n = leftLength;
+      childLength = rightLength;
+    }
+
+    levels--;
+
   }
+
+  if(forkId && hasParent) {
+
+    //parent are always children unless !hasParent
+    quickSort(A, n);
+    printf("performed quickSort as parent, awaiting merge\n");
+    
+    if(childLength > 0) {
+      
+      int child[childLength];
+      int nbytes = read(fd_cp[0], child, childLength * sizeof(int));
+      
+      printf("read %d bytes from child process\n", nbytes);
+
+    }
+
+    waitpid(-1, &indicator, 0);
+
+    // send data back through pipe
+    int nbytes = write(fd_cp[1], A, leftLength * sizeof(int));
+    printf("sent %d bytes to parent process\n", nbytes);
+
+    
+    // close pipes
+    close(fd_cp[0]);
+    close(fd_cp[1]);
+    
+    // terminate
+    printf("terminating child...!\n");
+    exit(0);
+
+  } else if(hasParent) {
+    //child 
+    quickSort(A, n);
+    printf("performed quickSort as leaf\n");
+    
+    // send data back through pipes
+    int nbytes = write(fd_cp[1], A, leftLength * sizeof(int));
+    printf("sent %d bytes to parent process\n", nbytes);
+
+    // close pipes
+    close(fd_cp[0]);
+    close(fd_cp[1]);
+    
+    // terminate
+    printf("terminating child...!\n");
+    exit(0);
+
+  } else {
+
+    quickSort(A, n);
+    printf("performed quickSort as root process, waiting on merge\n");
+
+    if(childLength > 0) {
+      
+      int child[childLength];
+      int nbytes = read(fd_cp[0], child, childLength * sizeof(int));
+      
+      printf("read %d bytes from child process\n", nbytes);
+
+      waitpid(-1, &indicator, 0);
+
+    }
+
+    printf("root finished! \n");
+
+  }
+
+}
+
+void notUsed(int A[], int n, int p) {
   //printArray(A, n);
 
-  int pivot = partition(A, n);
+  //int pivot = partition(A, n);
 
   //printArray(A, n);
  
-  printf("pivot: %d\n", pivot);
+  //printf("pivot: %d\n", pivot);
 
-  int leftLength = pivot + 1;
-  int rightLength = n - leftLength;  
-
-  int left[leftLength];
-  int right[rightLength];
-
-  memmove(left, A, sizeof(int) * leftLength);
-  memmove(right, &A[leftLength], sizeof(int) * rightLength);
-
-  quickSort(left, leftLength);
-  quickSort(right, rightLength);
+  //quickSort(left, leftLength);
+  //quickSort(right, rightLength);
 
   //printf("left: "); printArray(left, leftLength);
   //printf("right: "); printArray(right, rightLength);
   
-  memmove(A, left, sizeof(int) * leftLength);
-  memmove(&A[leftLength], right, sizeof(int) * rightLength);
+  //memmove(A, left, sizeof(int) * leftLength);
+  //memmove(&A[leftLength], right, sizeof(int) * rightLength);
   
   //printf("output: "); printArray(A, n);
 
