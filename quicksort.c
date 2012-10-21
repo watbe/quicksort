@@ -21,7 +21,6 @@ void paramError(char *msg) {
   exit(1);
 } //paramError()
 
-
 // perform distributed or concurrent sort of A[0:n-1] using p processes 
 // orthreads
 int main(int argc, char *argv[]) {
