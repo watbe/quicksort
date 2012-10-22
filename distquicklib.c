@@ -36,21 +36,26 @@ typedef int bool;
 #define false 0
 
 
-void recursive_partition(int A[], int n, int p, int *segments, int *segIndex, int shift) {
+int recursive_partition(int A[], int n, int p, int *segments, int *segIndex, int leftLength) {
   
-  if (!p) return;
+  if(!p) {printf("=====\n"); return 0;}
+
   printf("segIndex: %d partition request for:", *segIndex); printArray(A, n);
   int pivot = partition(A, n);
   
   printf("partitioned left:"); printArray(A, pivot+1);
-  printf("partitioned right:"); printArray(&A[pivot+1], n-pivot - 1);
+  printf("partitioned right:"); printArray(&A[pivot+1], n-pivot-1);
+  
+  segments[*segIndex] = leftLength + pivot + 1;
+  *segIndex = *segIndex+1;
+  printf("pivot at: %d, added length: %d, at segIndex: %d\n", pivot+1, leftLength, *segIndex);
 
-  segments[*segIndex] = shift + pivot + 1;
-  *segIndex = *segIndex + 1;
-  printf("added new pivot: %d at segIndex: %d\n", pivot + 1, *segIndex);
+  recursive_partition(A, pivot+1, p-1, segments, segIndex, leftLength);
 
-  recursive_partition(A, pivot+1, p - 1, segments, segIndex, 0);
-  recursive_partition(&A[pivot+1], n - pivot - 1, p - 1, segments, segIndex, pivot + 1);
+  recursive_partition(&A[pivot+1], n-pivot-1, p-1, segments, segIndex, pivot + 1);
+
+  return n;
+
 }
 
 // distributed quick sort using pipes

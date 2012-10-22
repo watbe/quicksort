@@ -12,7 +12,7 @@
 
 #include "quicklib.h"
 
-//#define DEBUG        /* test correctness of quickSort */
+#define DEBUG        /* test correctness of quickSort */
 //#define CHECK_PIVOT_QUALITY /* check quality of pivot strategy */
 
 int lg2(int n) {
