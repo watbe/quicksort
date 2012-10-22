@@ -29,158 +29,103 @@
 #include "quicklib.h"
 #include "distquicklib.h"
 
+#include <errno.h>
+
 typedef int bool;
 #define true 1
 #define false 0
 
+
+void recursive_partition(int A[], int n, int p, int *segments, int *segIndex, int shift) {
+  
+  if (!p) return;
+  printf("segIndex: %d partition request for:", *segIndex); printArray(A, n);
+  int pivot = partition(A, n);
+  
+  printf("partitioned left:"); printArray(A, pivot+1);
+  printf("partitioned right:"); printArray(&A[pivot+1], n-pivot - 1);
+
+  segments[*segIndex] = shift + pivot + 1;
+  *segIndex = *segIndex + 1;
+  printf("added new pivot: %d at segIndex: %d\n", pivot + 1, *segIndex);
+
+  recursive_partition(A, pivot+1, p - 1, segments, segIndex, 0);
+  recursive_partition(&A[pivot+1], n - pivot - 1, p - 1, segments, segIndex, pivot + 1);
+}
+
 // distributed quick sort using pipes
 void quickPipe(int A[], int n, int p) {
 
-  //int fraction = p;
-  
-  bool hasParent = false;
-  
-  int childLength = 0;
-  int leftLength = 0;
-  int rightLength = 0;
-
-  int forkId = 0;
-  int fd_cp[2];
-  
-  int indicator;
-
+  printf("original array:"); printArray(A, n);
+  //calculate partitions and partition
   int levels = lg2(p);
 
-  while(levels != 0) {
+  // segments are the index of each child, index of 0 for root is assumed
+  int segments[p];
+  segments[p-1] = n;
+  int seg_index = 0;
+  int *seg_ptr = &seg_index;
+  *seg_ptr = 0;
 
-    // Partition into two
-    int pivot = partition(A, n);
-
-    // split off right side 
-    leftLength = pivot + 1;
-    rightLength = n - leftLength;  
-    int right[rightLength];
-    memmove(right, &A[leftLength], sizeof(int) * rightLength);
-
-    // construct pipes
-    int status = pipe(fd_cp); if (status != 0) perror("pipe error: ");
-
-    // fork
-    printf("forked a new process\n");
-    forkId = fork();
-
-    // if it's the child, set A[] to the right side, length
-    // to the new length;
-    if(!forkId) {
+  recursive_partition(A, n, levels, segments, seg_ptr, 0);
   
-      // flag that it has a parent because forkId gets overwritten
-      hasParent = true;
-      
-      //child
-      n = rightLength;
-      // make array smaller
-      A = malloc(rightLength * sizeof(int));
-      // copy into A
-      memmove(A, right, rightLength * sizeof(int));
-    } else {
-      // parent needs new length to tell it how much to sort.
-      // but array A can be the same (should maybe free()?).
-      n = leftLength;
-      childLength = rightLength;
-    }
+  // sort segments (using provided quicksort)...
+  quickSort(segments, p);
 
-    levels--;
+  printf("partition result:"); printArray(A, n);
 
+  printf("segments:"); printArray(segments, p);
+  
+  // set up pipes
+  int pipeReadArray[p - 1]; // read-write pairs
+  int pipeWriteArray[p - 1]; 
+  
+  int i;
+  for(i = 0; i < p - 1; i++) {
+    int fd_child_to_parent[2];
+    int status = pipe(fd_child_to_parent); if (status) perror("pipe error:");
+    pipeReadArray[i] = fd_child_to_parent[0];
+    pipeWriteArray[i] = fd_child_to_parent[1];
+    printf("piped! %d, %d\n", fd_child_to_parent[0], fd_child_to_parent[1]);
   }
 
-  if(forkId && hasParent) {
+  printf("pipeReadArray:"); printArray(pipeReadArray, p-1);
+  printf("pipeWriteArray:"); printArray(pipeWriteArray, p-1);
 
-    //parent are always children unless !hasParent
-    quickSort(A, n);
-    printf("performed quickSort as parent, awaiting merge\n");
-    
-    if(childLength > 0) {
+  for(i = 0; i < p - 1; i++) {
+    if(!fork()) {
+      //child sorts their segment
+      int childStartIndex = segments[i];
+      int childLength = segments[i+1] - childStartIndex;
+      printf("childStartIndex: %d, childLength: %d\n", childStartIndex, childLength);
       
-      int child[childLength];
-      int nbytes = read(fd_cp[0], child, childLength * sizeof(int));
+      quickSort(&A[childStartIndex], childLength);
+      printf("child sorted: "); printArray(&A[childStartIndex], childLength);
       
-      printf("read %d bytes from child process\n", nbytes);
+      // send data back through pipe
+      int nbytes = write(pipeWriteArray[i], &A[childStartIndex], childLength * sizeof(int));
+      printf("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))); 
 
+      exit(0);  
     }
-
-    waitpid(-1, &indicator, 0);
-
-    // send data back through pipe
-    int nbytes = write(fd_cp[1], A, leftLength * sizeof(int));
-    printf("sent %d bytes to parent process\n", nbytes);
-
-    
-    // close pipes
-    close(fd_cp[0]);
-    close(fd_cp[1]);
-    
-    // terminate
-    printf("terminating child...!\n");
-    exit(0);
-
-  } else if(hasParent) {
-    //child 
-    quickSort(A, n);
-    printf("performed quickSort as leaf\n");
-    
-    // send data back through pipes
-    int nbytes = write(fd_cp[1], A, leftLength * sizeof(int));
-    printf("sent %d bytes to parent process\n", nbytes);
-
-    // close pipes
-    close(fd_cp[0]);
-    close(fd_cp[1]);
-    
-    // terminate
-    printf("terminating child...!\n");
-    exit(0);
-
-  } else {
-
-    quickSort(A, n);
-    printf("performed quickSort as root process, waiting on merge\n");
-
-    if(childLength > 0) {
-      
-      int child[childLength];
-      int nbytes = read(fd_cp[0], child, childLength * sizeof(int));
-      
-      printf("read %d bytes from child process\n", nbytes);
-
-      waitpid(-1, &indicator, 0);
-
-    }
-
-    printf("root finished! \n");
-
   }
-
-}
-
-void notUsed(int A[], int n, int p) {
-  //printArray(A, n);
-
-  //int pivot = partition(A, n);
-
-  //printArray(A, n);
+  
+  quickSort(A, segments[0]);  
+  printf("root sorted: "); printArray(A, segments[0]);
  
-  //printf("pivot: %d\n", pivot);
-
-  //quickSort(left, leftLength);
-  //quickSort(right, rightLength);
-
-  //printf("left: "); printArray(left, leftLength);
-  //printf("right: "); printArray(right, rightLength);
+  // wait for all children to exit
+  while (wait(NULL)) {
+    if (errno == ECHILD) {
+      break;
+    }
+  }
   
-  //memmove(A, left, sizeof(int) * leftLength);
-  //memmove(&A[leftLength], right, sizeof(int) * rightLength);
-  
-  //printf("output: "); printArray(A, n);
+  for(i = 0; i < p - 1; i++) {
+    int nbytes = read(pipeReadArray[i], &A[segments[i]], (segments[i+1] - segments[i]) * sizeof(int));  
+    printf("%d: read %d elements from child process\n", getpid(), (int) (nbytes/sizeof(int)));
+  }
+
+  printf("final result: "); printArray(A, n);
 
 } 
 
