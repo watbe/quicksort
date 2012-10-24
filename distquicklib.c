@@ -39,49 +39,75 @@ int* recurse(int A[], int n, int levels) {
   // if it's the final level, then don't partition, just quicksort
   if(levels == 0) {
     quickSort(A, n);
+    //printf("%d:  performed quicksort:", getpid()); printArray(A, n);
   } else { // else partition and recurse.
-    int pivot = partition(A, n);
-    int leftLength = pivot + 1;
-    int rightLength = n - pivot - 1;
-    
-    //set up pipe 1
-    int fd_left[2];
-    int status = pipe(fd_left); if(status) perror("pipe error:");
-    int forkId = fork();
-    if(!forkId) {
-      int *output = recurse(A, leftLength, levels - 1);
-      // send data back through pipe
-      int nbytes = write(fd_left[1], output, leftLength * sizeof(int));
-      printf("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))); 
-      exit(0);
-    }
 
-    //set up pipe 2
-    int fd_right[2];
-    status = pipe(fd_right); if(status) perror("pipe error:");
-    forkId = fork();
-    if(!forkId) {
-      int *output = recurse(&A[leftLength], rightLength, levels - 1);
-      // send data back through pipe
-      int nbytes = write(fd_right[1], output, rightLength * sizeof(int));
-      printf("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))); 
-      exit(0);
-    }
+    int pipesToRead[levels - 1];
+    int childLength[levels - 1];
+    int leftLength = 0;
 
-    // wait for all children to exit
-    while (wait(NULL)) {
-      if (errno == ECHILD) {
-        break;
+    int i;
+    for(i = levels - 1; i >= 0; i--) {
+      printf("%d: forloop start at level %d\n", getpid(), i);
+
+      //set up pipe 
+      int fd[2];
+      int status = pipe(fd); if(status) perror("pipe error:");
+      pipesToRead[i] = fd[0];
+
+      //partition
+      int pivot = partition(A, n);
+      leftLength = pivot + 1;
+      int rightLength = n - leftLength;
+
+      //store length
+      childLength[i] = rightLength;
+      printf("%d: childLength[%d] assigned with %d\n", getpid(), i, rightLength);
+      
+      //fork
+      int forkId = fork();
+      if(!forkId) {
+        // recurse
+        int *output = recurse(&A[leftLength], rightLength, i);
+
+        // send data back through pipe
+        int nbytes = write(fd[1], output, rightLength * sizeof(int));
+        printf("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))); 
+	printf("%d: child terminating\n", getpid());
+        exit(0);
+
+      } else {
+        // parent debugging:
+	//printf("%d: forked child with pid %d\n", getpid(), forkId);
       }
-    }
 
-    //combine pipes
-    int nbytes = read(fd_left[0], A, leftLength * sizeof(int));  
-    printf("%d: read %d elements from left process\n", getpid(), (int) (nbytes/sizeof(int)));
-    nbytes = read(fd_right[0], &A[leftLength], rightLength * sizeof(int));  
-    printf("%d: read %d elements from right process\n", getpid(), (int) (nbytes/sizeof(int)));
+      n = leftLength;
 
-  }
+    } // end for
+
+    quickSort(A, leftLength);
+    //printf("%d: performed quicksort:", getpid()); printArray(A, leftLength);
+
+    int acc = leftLength;
+    
+    // wait for all children to exit
+    //while (wait(NULL)) {
+    //  if (errno == ECHILD) {
+    //    break;
+    //  }
+    // }
+
+    for(i = 0; i < levels; i++) {
+      //combine pipes
+      int nbytes = read(pipesToRead[i], &A[acc], childLength[i] * sizeof(int));  
+      printf("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i);
+
+      //increment acc
+      acc += childLength[i];
+
+    } // end for pipes
+
+  } // endif
 
   return A;
 
@@ -89,8 +115,10 @@ int* recurse(int A[], int n, int levels) {
 
 // distributed quick sort using pipes
 void quickPipe(int A[], int n, int p) {
+  //printf("%d: start array:", getpid()); printArray(A, n);
   int levels = lg2(p);
   A = recurse(A, n, levels);
+  //printArray(A, n);
 } 
 
 
