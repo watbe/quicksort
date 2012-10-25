@@ -11,7 +11,7 @@
 
 // uncomment when debugging. Example call: PRINTF((("x=%d\n", x));
 #define PRINTF(x) do { printf x; fflush(stdout); } while (0) 
-//#define PRINTF((x) /* use when not debugging */
+//#define PRINTF(x) /* use when not debugging */
 
 #include <stdio.h>
 #include <stdlib.h>  	/* malloc, free */
@@ -31,7 +31,10 @@
 
 #include <errno.h>
 
-#define MAXBUF 8000000
+
+/***********************************************
+         begin pipes implementation
+***********************************************/
 
 int* recurse(int A[], int n, int levels) {
   int length = n;
@@ -95,13 +98,6 @@ int* recurse(int A[], int n, int levels) {
 
     int acc = leftLength;
     
-    // wait for all children to exit
-    //while (wait(NULL)) {
-    //  if (errno == ECHILD) {
-    //    break;
-    //  }
-    // }
-
     for(i = 0; i < levels; i++) {
       //combine pipes
       int nbytes = read(pipesToRead[i], &A[acc], childLength[i] * sizeof(int));  
@@ -131,6 +127,12 @@ void quickPipe(int A[], int n, int p) {
   A = recurse(A, n, levels);
   //printArray(A, n);
 } //quickPipe() 
+
+/***********************************************
+         begin sockets implementation
+***********************************************/
+
+#define MAXBUF 2048
 
 int* recurseSockets(int A[], int n, int levels) {
   int length = n;
@@ -228,11 +230,15 @@ int* recurseSockets(int A[], int n, int levels) {
         }
 
         /* ----Send the message---- */
-        nbytes = send(sockConnection, output, rightLength * sizeof(int), 0);
-        if (nbytes < 0) {
-          perror("Client failed to send data");
-          exit(-1);
-        }
+        int sentData = 0;
+        while(sentData != rightLength * sizeof(int)) {
+          nbytes = send(sockConnection, output, rightLength * sizeof(int), 0);
+          if (nbytes < 0) {
+            perror("Client failed to send data");
+            exit(-1);
+          }
+          sentData += nbytes;
+	}
       
         /* ----Close socket and terminate---- */
         close(sockConnection);
@@ -266,13 +272,6 @@ int* recurseSockets(int A[], int n, int levels) {
 
     int acc = leftLength;
     
-    // wait for all children to exit
-    //while (wait(null)) {
-    //  if (errno == echild) {
-    //    break;
-    //  }
-    // }
-    
     for(i = 0; i < levels; i++) {
 
       /* ----now we block waiting for a connection---- */
@@ -289,12 +288,28 @@ int* recurseSockets(int A[], int n, int levels) {
             getpid(), inet_ntoa(client.sin_addr)));
       
       /* ----wait to receive some data---- */
-      int nbytes = recv(sock_connection, &A[acc], childLength[i] * sizeof(int), 0);
-      if (nbytes < 0) {
-        perror("server recv error");
-        exit(-1);
+      int recievedBytes = 0;
+      int nbytes = 0;
+      int getBytes = MAXBUF;
+      int j = 0;
+
+      while(recievedBytes < childLength[i] * sizeof(int)) {
+ 
+        nbytes = recv(sock_connection, &A[acc + j], sizeof(int), 0);
+        if (nbytes < 0) {
+          perror("server recv error");
+          exit(-1);
+        }
+        
+        recievedBytes += nbytes;
+        
+	j++;  
       }
-  
+
+      PRINTF(("recievedBytes: %d, childLength * bytes: %d\n", recievedBytes, childLength[i] * sizeof(int)));
+
+      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i));
+
       /* ----close sockets and terminate---- */
       close(sock_connection);
       close(socketsToRead[i]);
@@ -302,13 +317,12 @@ int* recurseSockets(int A[], int n, int levels) {
       PRINTF(("%d: server finished.\n", getpid()));
 
       // assert that we recieve the amount expected
-      assert(nbytes == childLength[i] * sizeof(int));
-      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i));
+      //assert(recievedBytes == childLength[i] * sizeof(int));
 
       //increment acc
       acc += childLength[i];
 
-    } // end for pipes
+    } // end for 
 
     // ensure that all elements have been quicksorted
     assert(acc == length);
@@ -324,6 +338,11 @@ void quickSocket(int A[], int n, int p) {
   int levels = lg2(p);
   A = recurseSockets(A, n, levels);
 } //quickSocket()
+
+
+/***********************************************
+         begin pThreads implementation
+***********************************************/
 
 static int *array;
 static pthread_mutex_t rwLock;
