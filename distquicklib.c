@@ -325,96 +325,85 @@ void quickSocket(int A[], int n, int p) {
   A = recurseSockets(A, n, levels);
 } //quickSocket()
 
-// declare function recurseThreads first for ease
-void recurseThreads(int A[], int n, int levels); 
+static int *array;
 
-struct arg_struct {
-    int *arg1;
-    int arg2;
-    int arg3;
-    int arg4;
+struct quickArgs {
+  int start;
+  int length;
+  int level;
 };
 
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; // for locks
-
-void* threadMe(void *a) {
-  struct arg_struct *args;
-  args = (struct arg_struct *) a;
-  int *startPtr = args->arg1;
-  int lengthPtr = args->arg2;
-  int levelsPtr = args->arg3;
-  int threadId  = args->arg4;
-  
-  // recurse
-  recurseThreads(startPtr, lengthPtr, levelsPtr);
-
-  //TODO Assert	
-
-  PRINTF(("%d: thread terminating\n", threadId));
-    
-  //pthread_exit(0);
-  return NULL;
-  
-}
-
-volatile static int threadsCount = 0;
-
-void recurseThreads(int A[], int n, int levels) {
-  
-  int length = n;
-
-  // if it's the final level, then don't partition, just quicksort
+void* subSort(void *a) {
+  struct quickArgs *init = a;
+  int levels = init->level;
+  int start = init->start;
+  int length = init->length;
+   
   if(levels == 0) {
-    quickSort(A, n);
-    //PRINTF(("%d: performed quicksort at level 0:", getpid())); printArray(A, n);
+    quickSort(&array[start], length);
+    printf("quickSubSorted array of length %d:", length); printArray(&array[start], length);
     pthread_exit(0);
-  } else { // else partition and recurse.
+  }
 
-    pthread_t *threads = malloc((levels - 1) * sizeof(pthread_t)); 
-    //printf("created thread object at: %d.\n", (int) threads);
+  int pivot = partition(&array[start], length);
+  PRINTF(("partition result:")); printArray(&array[start], length);
+  PRINTF(("pivot found at %d\n", pivot));
 
-    int childLength[levels - 1];
-    int leftLength = 0;
+  int leftLength = pivot + 1;
+  int rightLength = length - leftLength;
 
-    int i;
-    for(i = levels - 1; i >= 0; i--) {
-      PRINTF(("%d: forloop start at level %d\n", getpid(), i));
+  pthread_t left, right;
 
-      //partition
-      int pivot = partition(A, n);
-      leftLength = pivot + 1;
-      int rightLength = n - leftLength;
+  struct quickArgs args = {start, leftLength, (levels - 1)};
+  pthread_create(&left, 0, subSort, &args);
 
-      //store length
-      childLength[i] = rightLength;
-      PRINTF(("%d: childLength[%d] assigned with %d\n", getpid(), i, rightLength));
+  struct quickArgs args1 = {start + leftLength, rightLength, levels - 1};
+  pthread_create(&right, 0, subSort, &args1);
 
-      struct arg_struct args = {&A[leftLength], rightLength, i, ++threadsCount};
+  pthread_join(left, NULL);
+  pthread_join(right, NULL);
 
-      pthread_create(&threads[i], NULL, threadMe, (void *) &args);
-      PRINTF(("%d: thread initialised \n", threadsCount));
-      
-      n = leftLength;
+  pthread_exit(0);
 
-    } // end for
-    
-    quickSort(A, leftLength);
-    //PRINTF(("%d: performed quicksort:", getpid()); printArray(A, leftLength));
-    
-    PRINTF(("attempting join\n"));
-
-    for(i = levels - 1; i < levels; i++) {
-      pthread_join(threads[i], NULL);
-    }
-    
-  } // endif
-
+  return NULL;
 }
+
+void recursiveThreads(int start, int length, int levels) {
+
+  // if no threads, then just sort.
+  if(levels == 0) {
+    quickSort(&array[start], length);
+    printf("quickSorted array of length %d:", length); printArray(&array[start], length);
+    return;
+  }
+
+  int pivot = partition(&array[start], length);
+  PRINTF(("partition result:")); printArray(&array[start], length);
+  PRINTF(("pivot found at %d\n", pivot));
+
+  int leftLength = pivot + 1;
+  int rightLength = length - leftLength;
+
+  pthread_t left, right;
+
+  struct quickArgs args = {start, leftLength, levels - 1};
+  pthread_create(&left, 0, subSort, &args);
+
+  struct quickArgs args1 = {leftLength, rightLength, levels - 1};
+  pthread_create(&right, 0, subSort, &args1);
+
+  pthread_join(left, NULL);
+  pthread_join(right, NULL);
+
+};
 
 // concurrent quick sort using pthreads 
 void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
-  //printf("%d: start array:",getpid()); printArray(pA, pn);
+  PRINTF(("start array:")); printArray(pA, pn);
   int levels = lg2(p);
-  recurseThreads(pA, pn, levels);
-  //printf("%d: end array:",getpid()); printArray(pA, pn);
+  array = pA;
+  
+  recursiveThreads(0, pn, levels);
+  PRINTF(("end array:")); printArray(pA, pn);
 } //quickThread()
+
