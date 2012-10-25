@@ -31,7 +31,7 @@
 
 #include <errno.h>
 
-#define MAXBUF 2048
+#define MAXBUF 8000000
 
 int* recurse(int A[], int n, int levels) {
   int length = n;
@@ -326,11 +326,17 @@ void quickSocket(int A[], int n, int p) {
 } //quickSocket()
 
 static int *array;
+static pthread_mutex_t rwLock;
+static enum WaitMechanismType *pOption;
+static pthread_mutex_t *locks;
+static volatile int *p_memlocks;
+static int threadCounter;
 
 struct quickArgs {
   int start;
   int length;
   int level;
+  int id;
 };
 
 void recursiveThreads(int start, int length, int levels);
@@ -340,12 +346,20 @@ void* subSort(void *a) {
   int levels = init->level;
   int start = init->start;
   int length = init->length;
+  int myId = init->id;
    
-  PRINTF(("NEW THREAD\n"));
+  PRINTF(("new thread with id %d created\n", myId));
   
   if(levels == 0) {
     quickSort(&array[start], length);
     printf("quickSubSorted array of length %d:", length); printArray(&array[start], length);
+    if(*pOption == WAIT_MUTEX) {
+      PRINTF(("trying to unlock myId %d\n", myId));
+      pthread_mutex_unlock(&locks[myId]);
+      PRINTF(("unlocked myId %d\n", myId));
+    } else if (*pOption == WAIT_MEMLOC) {
+      p_memlocks[myId] = 0; 
+    } 
     pthread_exit(0);
   }
 
@@ -356,14 +370,28 @@ void* subSort(void *a) {
   int leftLength = pivot + 1;
   int rightLength = length - leftLength;
 
-  pthread_t left, right;
+  pthread_t right;
 
   recursiveThreads(start, leftLength, levels - 1);
 
-  struct quickArgs args1 = {start + leftLength, rightLength, levels - 1};
-  pthread_create(&right, 0, subSort, &args1);
+  pthread_mutex_lock(&rwLock);
+  int threadId = threadCounter++;
+  pthread_mutex_unlock(&rwLock);
 
-  pthread_join(right, NULL);
+  struct quickArgs args = {start + leftLength, rightLength, levels - 1, threadId};
+  pthread_create(&right, 0, subSort, &args);
+
+  if (*pOption == WAIT_JOIN) { 
+    pthread_join(right, NULL);
+  } else if(*pOption == WAIT_MUTEX) {
+    pthread_mutex_lock(&locks[threadId]);
+    PRINTF(("trying to unlock myId %d\n", myId));
+    pthread_mutex_unlock(&locks[myId]);
+    PRINTF(("unlocked myId %d\n", myId));
+  } else if (*pOption == WAIT_MEMLOC) {
+    while(p_memlocks[threadId] != 0);
+    p_memlocks[myId] = 0;
+  } 
 
   pthread_exit(0);
 
@@ -387,20 +415,63 @@ void recursiveThreads(int start, int length, int levels) {
   int leftLength = pivot + 1;
   int rightLength = length - leftLength;
 
-  pthread_t left, right;
+  pthread_t right;
 
   recursiveThreads(start, leftLength, levels - 1);
+  
+  // prevent synchronisation issues
+  pthread_mutex_lock(&rwLock);
+  int threadId = threadCounter++;
+  pthread_mutex_unlock(&rwLock);
 
-  struct quickArgs args1 = {start + leftLength, rightLength, levels - 1};
-  pthread_create(&right, 0, subSort, &args1);
-
-  pthread_join(right, NULL);
+  struct quickArgs args = {start + leftLength, rightLength, levels - 1, threadId};
+  pthread_create(&right, 0, subSort, &args);
+ 
+  if (*pOption == WAIT_JOIN) { 
+    pthread_join(right, NULL);
+  } else if(*pOption == WAIT_MUTEX) {
+    // lock to confirm child thread exit
+    pthread_mutex_lock(&locks[threadId]);
+  } else if (*pOption == WAIT_MEMLOC) {
+    // while the memloc isn't 0, spin...
+    while(p_memlocks[threadId] != 0);
+  } 
 
 };
+
 
 // concurrent quick sort using pthreads 
 void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
   PRINTF(("start array:")); printArray(pA, pn);
+
+  pOption = malloc(sizeof(enum WaitMechanismType));
+  *pOption = pWaitMech;
+  threadCounter = 0;
+
+  if (*pOption == WAIT_JOIN) { 
+    PRINTF(("WAIT_JOIN\n"));
+  } else if (*pOption == WAIT_MUTEX) {
+    //locks all locks to allow unlocking
+    PRINTF(("WAIT_MUTEX\n"));
+    locks = malloc((sizeof(pthread_mutex_t) * (p-1)));
+
+    int i;
+    for(i = 0; i < p - 1; i++) {
+      pthread_mutex_lock(&locks[i]);
+    }
+
+  } else if (*pOption == WAIT_MEMLOC) {
+    PRINTF(("WAIT_MEMLOC\n"));
+    p_memlocks = malloc(sizeof(int) * (p - 1));
+    
+    int i;
+    for(i = 0; i < p - 1; i++) {
+      p_memlocks[i] = 1;
+    }
+
+  } 
+  
+  PRINTF(("start processing!\n"));
   int levels = lg2(p);
   array = pA;
   
