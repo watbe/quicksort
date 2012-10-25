@@ -325,28 +325,50 @@ void quickSocket(int A[], int n, int p) {
   A = recurseSockets(A, n, levels);
 } //quickSocket()
 
-void recurseThreads(A, n, levels) {
+// declare function recurseThreads first for ease
+void recurseThreads(int A[], int n, int levels); 
+
+struct arg_struct {
+    int *arg1;
+    int arg2;
+    int arg3;
+};
+
+void* threadMe(void *a) {
+  struct arg_struct *args;
+  args = (struct arg_struct *) a;
+  int *startPtr = args->arg1;
+  int lengthPtr = args->arg2;
+  int levelsPtr = args->arg3;
+  
+  // recurse
+  recurseThreads(startPtr, lengthPtr, levelsPtr);
+
+  //TODO Assert	
+
+  PRINTF(("%d: child terminating\n", getpid()));
+  pthread_exit(0);
+  
+}
+
+void recurseThreads(int A[], int n, int levels) {
   
   int length = n;
 
   // if it's the final level, then don't partition, just quicksort
   if(levels == 0) {
     quickSort(A, n);
-    //PRINTF(("%d:  performed quicksort:", getpid())); printArray(A, n);
+    PRINTF(("%d: performed quicksort at level 0:", getpid())); printArray(A, n);
   } else { // else partition and recurse.
 
-    int pipesToRead[levels - 1];
+    pthread_t *threads = malloc((levels - 1) * sizeof(pthread_t)); 
+
     int childLength[levels - 1];
     int leftLength = 0;
 
     int i;
     for(i = levels - 1; i >= 0; i--) {
       PRINTF(("%d: forloop start at level %d\n", getpid(), i));
-
-      //set up pipe 
-      int fd[2];
-      int status = pipe(fd); if(status) perror("pipe error:");
-      pipesToRead[i] = fd[0];
 
       //partition
       int pivot = partition(A, n);
@@ -356,69 +378,33 @@ void recurseThreads(A, n, levels) {
       //store length
       childLength[i] = rightLength;
       PRINTF(("%d: childLength[%d] assigned with %d\n", getpid(), i, rightLength));
-      
-      //fork
-      int forkId = fork();
-      if(!forkId) {
-        
-	// recurse
-        int *output = recurse(&A[leftLength], rightLength, i);
 
-        // send data back through pipe
-        int nbytes = write(fd[1], output, rightLength * sizeof(int));
-	close(fd[1]);
-	
-	// assert that we wrote all bytes
-	assert (nbytes == rightLength * sizeof(int));
-        PRINTF(("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))));
-	PRINTF(("%d: child terminating\n", getpid()));
-        exit(0);
+      struct arg_struct args;
+      args.arg1 = &A[leftLength];
+      args.arg2 = rightLength;
+      args.arg3 = i;
 
-      } else {
-        // parent debugging:
-	//PRINTF(("%d: forked child with pid %d\n", getpid(), forkId));
-      }
+      pthread_create(&threads[i], NULL, threadMe, (void *) &args);
 
       n = leftLength;
 
     } // end for
 
     quickSort(A, leftLength);
-    //PRINTF(("%d: performed quicksort:", getpid()); printArray(A, leftLength));
-
-    int acc = leftLength;
+    PRINTF(("%d: performed quicksort:", getpid()); printArray(A, leftLength));
     
-    // wait for all children to exit
-    //while (wait(NULL)) {
-    //  if (errno == ECHILD) {
-    //    break;
-    //  }
-    // }
-
     for(i = 0; i < levels; i++) {
-      //combine pipes
-      int nbytes = read(pipesToRead[i], &A[acc], childLength[i] * sizeof(int));  
-      close(pipesToRead[i]);
-      // assert that we recieve the amount expected
-      assert(nbytes == childLength[i] * sizeof(int));
-      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i));
-
-      //increment acc
-      acc += childLength[i];
-
-    } // end for pipes
-
-    // ensure that all elements have been quicksorted
-    assert(acc == length);
+      if(pthread_join(threads[i], NULL) != 0) printf("pthread_join error!\n");
+    }
 
   } // endif
-
-  return A;
 
 }
 
 // concurrent quick sort using pthreads 
 void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
+  printf("%d: start array:",getpid()); printArray(pA, pn);
   int levels = lg2(p);
-  A = recurseThreads(A, n, levels);
+  recurseThreads(pA, pn, levels);
+  printf("%d: end array:",getpid()); printArray(pA, pn);
 } //quickThread()
