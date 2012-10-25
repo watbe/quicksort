@@ -333,12 +333,16 @@ struct quickArgs {
   int level;
 };
 
+void recursiveThreads(int start, int length, int levels);
+
 void* subSort(void *a) {
   struct quickArgs *init = a;
   int levels = init->level;
   int start = init->start;
   int length = init->length;
    
+  PRINTF(("NEW THREAD\n"));
+  
   if(levels == 0) {
     quickSort(&array[start], length);
     printf("quickSubSorted array of length %d:", length); printArray(&array[start], length);
@@ -354,18 +358,17 @@ void* subSort(void *a) {
 
   pthread_t left, right;
 
-  struct quickArgs args = {start, leftLength, (levels - 1)};
-  pthread_create(&left, 0, subSort, &args);
+  recursiveThreads(start, leftLength, levels - 1);
 
   struct quickArgs args1 = {start + leftLength, rightLength, levels - 1};
   pthread_create(&right, 0, subSort, &args1);
 
-  pthread_join(left, NULL);
   pthread_join(right, NULL);
 
   pthread_exit(0);
 
   return NULL;
+
 }
 
 void recursiveThreads(int start, int length, int levels) {
@@ -386,13 +389,11 @@ void recursiveThreads(int start, int length, int levels) {
 
   pthread_t left, right;
 
-  struct quickArgs args = {start, leftLength, levels - 1};
-  pthread_create(&left, 0, subSort, &args);
+  recursiveThreads(start, leftLength, levels - 1);
 
-  struct quickArgs args1 = {leftLength, rightLength, levels - 1};
+  struct quickArgs args1 = {start + leftLength, rightLength, levels - 1};
   pthread_create(&right, 0, subSort, &args1);
 
-  pthread_join(left, NULL);
   pthread_join(right, NULL);
 
 };
