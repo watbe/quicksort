@@ -209,7 +209,6 @@ int* recurseSockets(int A[], int n, int levels) {
       
         int sockConnection;                /* client socket */
         struct sockaddr_in server; /* server address */
-        int nbytes;
       
         /* ----Create TCP/IP socket---- */
         sockConnection = socket(AF_INET, SOCK_STREAM, 0);
@@ -231,6 +230,7 @@ int* recurseSockets(int A[], int n, int levels) {
 
         /* ----Send the message---- */
         int sentData = 0;
+        int nbytes = 0;
         while(sentData != rightLength * sizeof(int)) {
           nbytes = send(sockConnection, output, rightLength * sizeof(int), 0);
           if (nbytes < 0) {
@@ -290,7 +290,6 @@ int* recurseSockets(int A[], int n, int levels) {
       /* ----wait to receive some data---- */
       int recievedBytes = 0;
       int nbytes = 0;
-      int getBytes = MAXBUF;
       int j = 0;
 
       while(recievedBytes < childLength[i] * sizeof(int)) {
@@ -306,7 +305,7 @@ int* recurseSockets(int A[], int n, int levels) {
 	j++;  
       }
 
-      PRINTF(("recievedBytes: %d, childLength * bytes: %d\n", recievedBytes, childLength[i] * sizeof(int)));
+      //PRINTF(("recievedBytes: %d, childLength * bytes: %d\n", recievedBytes, childLength[i] * sizeof(int)));
 
       PRINTF(("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i));
 
@@ -495,6 +494,10 @@ void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
   array = pA;
   
   recursiveThreads(0, pn, levels);
+
+  free(pOption);
+  free(locks);
+
   PRINTF(("end array:")); printArray(pA, pn);
 } //quickThread()
 

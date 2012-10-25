@@ -10,4 +10,27 @@
 
 --------------------------------------------------------------------- */
 
+1) The message size associated with the problem is the size of buffer
+   as defined by MAXBUF. The write method stops writing once the max
+   buffer size has been written, and the read stops reading after the
+   max buffer has been read. Thus sequential writes and reads are 
+   needed in order to send the data from the child processes to the 
+   parents. 
 
+   In order to do this, I simply continued to poll the recv method
+   until the required amount was read, and similarly sent the data
+   in MAXBUF increments until everything was sent.
+
+2)  
+
+4) wait_on_memlock can be safely used in this situation because we
+   do not expect multiple threads to be writing to the same shared
+   memory. The volatile keyword indicates to the compiler that the 
+   variable should not be optimised as it may be modified by another
+   thread. Typically the compiler may optimise the while loop used for
+   checking for memlock access to a while(true) which would not be
+   helpful at all. The keyword prevents this from happening.
+
+5)
+
+6)
