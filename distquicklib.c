@@ -499,6 +499,16 @@ void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
   
   recursiveThreads(0, pn, levels);
 
+  //cleanup!
+  if (*pOption == WAIT_MUTEX) {
+    int i;
+    for(i = 0; i < p - 1; i++) {
+      pthread_mutex_destroy(&locks[i]);
+    }
+  } else if (*pOption == WAIT_MEMLOC) {
+    //free(p_memlocks); --doesn't work with volatile vars
+  } 
+
   free(pOption);
   free(locks);
 

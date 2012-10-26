@@ -21,7 +21,47 @@
    until the required amount was read, and similarly sent the data
    in MAXBUF increments until everything was sent.
 
-2)  
+2) For p(4):
+   quicksort -p 8000000 4:      0.348390s
+   quicksort -s 8000000 4:      2.173409s
+   quicksort -t -v 0 8000000 4: 0.308456s
+   quicksort -t -v 1 8000000 4: 0.308144s 
+   quicksort -t -v 2 8000000 4: 0.307610s 
+
+   The quickThread implementation is undoubtedly the fastest version
+   of the quicksort. This is likely due to the use of shared memory
+   to avoid the overhead of communicating data back to the parent of
+   each child thread/process. 
+
+   For p(1):
+   quicksort -p 8000000 1:      0.839866s
+   quicksort -s 8000000 1:      0.838132s
+   quicksort -t -v 0 8000000 1: 0.832589s
+   quicksort -t -v 1 8000000 1: 0.837366s 
+   quicksort -t -v 2 8000000 1: 0.839159s
+
+   As expected, the sorts for all variant are similar at p = 1, due
+   to the lack of pipes, sockets, and threads utilised, so they are
+   effectively running the same algorithm.
+
+   The theorectical speedup of 4x by using p = 4 is not seen; the data
+   shows a maximum improvement of just over 2x for most, and in fact
+   a deterimental effect for sockets, due to the continuous polling
+   of the data in order to work around the max buffer (there is likely
+   a better implementation for sockets).
+
+   We can attribute the fact that it has not achieved a 4x improvement
+   as expected to context switching between the processes, since on 
+   a quad-core machine we would expect to have use of at least one
+   process to run the operating system, so it is unlikely that the 
+   processes/threads had the whole CPU to itself. Hence the overhead
+   of waiting on processes to finish coupled with context switching
+   makes the observed improvement lower than theoretical.
+
+   With larger values of p, where p > cores, we see that the overhead
+   increase more, and the time taken to sort actually increases with 
+   more threads. This is expected due to the inefficiencies of 
+   running more threads/processes than the CPU can handle.
 
 4) wait_on_memlock can be safely used in this situation because we
    do not expect multiple threads to be writing to the same shared
@@ -31,6 +71,27 @@
    checking for memlock access to a while(true) which would not be
    helpful at all. The keyword prevents this from happening.
 
-5)
+5) Using the data already provided in part 2, we can see marginal
+   increases in the speed by using different waiting mechanisms. 
+   It is not possible to see a discernible difference with n=8000
+   as askrd by the assignment specifications.
 
-6)
+   We can conclude that there is little difference between the 
+   different implementations, with only the wait_on_memloc version
+   consistently faster by about ~1%.
+
+6) quicksort-nomc -t -v 0 8000000 32: 0.252833s
+   quicksort-nomc -t -v 1 8000000 32: 0.256827s
+   quicksort-nomc -t -v 2 8000000 32: 0.285565s
+
+   It is observed that the memlock variant is slower than its
+   counterparts. This is likely due to the fact that the memlock
+   variant polls the memlock variable for availablity, wasting
+   CPU cycles when the other variants do not.
+
+   It is interesting to note that the algorithms run about 10% faster
+   if p = 8, however it slows down by p > 8. This may be attributed
+   to scheduler inefficiences where 4 threads/processes aren't being
+   fully utilised properly, whereas more than 4 threads/processes 
+   force the scheduler to utilise more CPU cores. This result is 
+   reflected in p = 32.
