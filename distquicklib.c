@@ -288,21 +288,10 @@ int* recurseSockets(int A[], int n, int levels) {
             getpid(), inet_ntoa(client.sin_addr)));
       
       /* ----wait to receive some data---- */
-      int recievedBytes = 0;
-      int nbytes = 0;
-      int j = 0;
-
-      while(recievedBytes < childLength[i] * sizeof(int)) {
- 
-        nbytes = recv(sock_connection, &A[acc + j], sizeof(int), 0);
-        if (nbytes < 0) {
-          perror("server recv error");
-          exit(-1);
-        }
-        
-        recievedBytes += nbytes;
-        
-	j++;  
+      int nbytes = recv(sock_connection, &A[acc], childLength[i] * sizeof(int), MSG_WAITALL);
+      if (nbytes < 0) {
+        perror("server recv error");
+        exit(-1);
       }
 
       //PRINTF(("recievedBytes: %d, childLength * bytes: %d\n", recievedBytes, childLength[i] * sizeof(int)));

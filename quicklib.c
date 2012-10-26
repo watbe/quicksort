@@ -2,7 +2,7 @@
    for comp2310 assignment 2, 2012
 
    written by Peter Strazdins, RSCS ANU, 09/12
-   version 1.0 30/10/12
+   version 1.1 16/10/12 
 */
 
 #include <stdio.h>
@@ -12,7 +12,7 @@
 
 #include "quicklib.h"
 
-#define DEBUG        /* test correctness of quickSort */
+//#define DEBUG        /* test correctness of quickSort */
 //#define CHECK_PIVOT_QUALITY /* check quality of pivot strategy */
 
 int lg2(int n) {
@@ -67,7 +67,7 @@ int partition(int A[], int n) {
       i++; j--;
     }
   } //while(...)           
-  assert (j >= 0 && j < n);  
+  if (j < 0) j = 0;
   return (j);
 } //partition()
 
@@ -103,6 +103,11 @@ void genArray(int A[], int n, int s) {
     A[i] = rand() % MAX_ELT;
 } //genArray()
 
+static int compint(const void *vx, const void *vy) {
+  int x = * ((int *) vx),
+    y = * ((int *) vy);
+  return ((x < y)? -1: (x > y)? +1 : 0);
+}
 
 void checkArray(int A[], int n, int s) {
   int *B; // temporary buffer
@@ -123,7 +128,7 @@ void checkArray(int A[], int n, int s) {
   printf("average quick sort call depth = %ld (ideal=%d)\n", 
 	 qCalls==0? 0: qDepthSum / qCalls, lg2(n));
 #endif
-  quickSort(B, n); // assumed correct!   
+  qsort(B, n, sizeof(int), compint);
 #ifdef DEBUG
   checkPost = n>0? B[0]: 0;
   nerrs = 0;

@@ -2,7 +2,7 @@
    algorithms for COMP2310 Assignment 2, 2012
 
    written by Peter Strazdins, RSCS ANU, 09/12
-   version 1.0 30/10/12
+   version 1.1 16/10/12
 */
 
 #include <stdio.h>
@@ -17,9 +17,10 @@
 // handle command line parameter error
 void paramError(char *msg) {
   printf("quicksort: parameter error: %s\n", msg);
-  printf("usage: quicksort [-t|-s|-p] [-v v] n [p [s]]\n");
+  printf("usage: quicksort [-t|-s|-p] [-d] [-v v] n [p [s]]\n");
   exit(1);
 } //paramError()
+
 
 // perform distributed or concurrent sort of A[0:n-1] using p processes 
 // orthreads
@@ -42,7 +43,7 @@ int main(int argc, char *argv[]) {
   selectAlg = 0;
   threadSync = WAIT_JOIN;
   
-  while ((optchar = getopt(argc, argv, "+pstv:")) != -1) {
+  while ((optchar = getopt(argc, argv, "+pstv:d")) != -1) {
     // extract next option from the command line 
     int v = 0;
     switch (optchar) {
@@ -52,6 +53,8 @@ int main(int argc, char *argv[]) {
       selectAlg = 1; break;
     case 't':
       selectAlg = 2; break;
+    case 'd':
+      printA = 1; break;
     case 'v':
       if (sscanf(optarg, "%d", &v) != 1 || v<0 || v>2)
 	paramError("invalid integer with -v");
@@ -67,8 +70,6 @@ int main(int argc, char *argv[]) {
   if (optind >= argc) 
     paramError("array length n is missing");
   n = atoi(argv[optind]);
-  if (n < 0)
-    printA = 1, n = -n;
   if (optind+1 < argc)
     p = atoi(argv[optind+1]);
   if (optind+2 < argc)
