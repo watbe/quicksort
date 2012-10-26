@@ -164,7 +164,7 @@ int* recurseSockets(int A[], int n, int levels) {
         perror("socket() Socket was not created");
         exit(-1);
       }
-      printf("%d: Socket created successfully.\n", getpid());
+      PRINTF(("%d: Socket created successfully.\n", getpid()));
     
       /* ----Address information for use with bind---- */
       server.sin_family = AF_INET;         /* it is an IP address */
@@ -183,7 +183,7 @@ int* recurseSockets(int A[], int n, int levels) {
         perror("Server get port number");
         exit(-1);
       }
-      printf("The assigned server port number is %d\n", ntohs(server.sin_port));
+      PRINTF(("The assigned server port number is %d\n", ntohs(server.sin_port)));
       
       int portNumber = ntohs(server.sin_port);
     
@@ -216,7 +216,7 @@ int* recurseSockets(int A[], int n, int levels) {
           perror("Client socket creation");
           exit(-1);
         }
-        printf("Client socket created\n");
+        PRINTF(("Client socket created\n"));
       
         /* ----Address and port information for server---- */
         server.sin_family      = AF_INET;
@@ -471,12 +471,16 @@ void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
   } else if (*pOption == WAIT_MUTEX) {
     //locks all locks to allow unlocking
     PRINTF(("WAIT_MUTEX\n"));
-    locks = malloc((sizeof(pthread_mutex_t) * (p-1)));
 
+    locks = malloc((sizeof(pthread_mutex_t) * (p-1)));
+    
     int i;
     for(i = 0; i < p - 1; i++) {
+      pthread_mutex_init(&locks[i], NULL);
       pthread_mutex_lock(&locks[i]);
     }
+
+    PRINTF(("FINISHED PRE-LOCKING\n"));
 
   } else if (*pOption == WAIT_MEMLOC) {
     PRINTF(("WAIT_MEMLOC\n"));
