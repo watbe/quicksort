@@ -10,8 +10,8 @@
 */
 
 // uncomment when debugging. Example call: PRINTF((("x=%d\n", x));
-#define PRINTF(x) do { printf x; fflush(stdout); } while (0) 
-//#define PRINTF(x) /* use when not debugging */
+//#define PRINTF(x) do { printf x; fflush(stdout); } while (0) 
+#define PRINTF(x) /* use when not debugging */
 
 #include <stdio.h>
 #include <stdlib.h>  	/* malloc, free */
@@ -71,22 +71,22 @@ int* recurse(int A[], int n, int levels) {
       int forkId = fork();
       if(!forkId) {
         
-	// recurse
+        // recurse
         int *output = recurse(&A[leftLength], rightLength, i);
 
         // send data back through pipe
         int nbytes = write(fd[1], output, rightLength * sizeof(int));
-	close(fd[1]);
+        close(fd[1]);
 	
-	// assert that we wrote all bytes
-	assert (nbytes == rightLength * sizeof(int));
+	      // assert that we wrote all bytes
+	      assert (nbytes == rightLength * sizeof(int));
         PRINTF(("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))));
-	PRINTF(("%d: child terminating\n", getpid()));
+	      PRINTF(("%d: child terminating\n", getpid()));
         exit(0);
 
       } else {
         // parent debugging:
-	//PRINTF(("%d: forked child with pid %d\n", getpid(), forkId));
+	      //PRINTF(("%d: forked child with pid %d\n", getpid(), forkId));
       }
 
       n = leftLength;
@@ -370,11 +370,11 @@ void* subSort(void *a) {
   
   if(levels == 0) {
     quickSort(&array[start], length);
-    printf("quickSubSorted array of length %d:", length); printArray(&array[start], length);
+    //PRINTF(("quickSorted array of length %d:", length)); printArray(&array[start], length);
     if(*pOption == WAIT_MUTEX) {
-      PRINTF(("trying to unlock myId %d\n", myId));
+      //PRINTF(("trying to unlock myId %d\n", myId));
       pthread_mutex_unlock(&locks[myId]);
-      PRINTF(("unlocked myId %d\n", myId));
+      //PRINTF(("unlocked myId %d\n", myId));
     } else if (*pOption == WAIT_MEMLOC) {
       p_memlocks[myId] = 0; 
     } 
@@ -382,15 +382,13 @@ void* subSort(void *a) {
   }
 
   int pivot = partition(&array[start], length);
-  PRINTF(("partition result:")); printArray(&array[start], length);
-  PRINTF(("pivot found at %d\n", pivot));
+  //PRINTF(("partition result:")); printArray(&array[start], length);
+  //PRINTF(("pivot found at %d\n", pivot));
 
   int leftLength = pivot + 1;
   int rightLength = length - leftLength;
 
   pthread_t right;
-
-  recursiveThreads(start, leftLength, levels - 1);
 
   pthread_mutex_lock(&rwLock);
   int threadId = threadCounter++;
@@ -398,6 +396,8 @@ void* subSort(void *a) {
 
   struct quickArgs args = {start + leftLength, rightLength, levels - 1, threadId};
   pthread_create(&right, 0, subSort, &args);
+
+  recursiveThreads(start, leftLength, levels - 1);
 
   if (*pOption == WAIT_JOIN) { 
     pthread_join(right, NULL);
@@ -422,20 +422,18 @@ void recursiveThreads(int start, int length, int levels) {
   // if no threads, then just sort.
   if(levels == 0) {
     quickSort(&array[start], length);
-    printf("quickSorted array of length %d:", length); printArray(&array[start], length);
+    //PRINTF(("quickSorted array of length %d:", length)); printArray(&array[start], length);
     return;
   }
 
   int pivot = partition(&array[start], length);
-  PRINTF(("partition result:")); printArray(&array[start], length);
-  PRINTF(("pivot found at %d\n", pivot));
+  //PRINTF(("partition result:")); printArray(&array[start], length);
+  //PRINTF(("pivot found at %d\n", pivot));
 
   int leftLength = pivot + 1;
   int rightLength = length - leftLength;
 
   pthread_t right;
-
-  recursiveThreads(start, leftLength, levels - 1);
   
   // prevent synchronisation issues
   pthread_mutex_lock(&rwLock);
@@ -444,6 +442,8 @@ void recursiveThreads(int start, int length, int levels) {
 
   struct quickArgs args = {start + leftLength, rightLength, levels - 1, threadId};
   pthread_create(&right, 0, subSort, &args);
+  
+  recursiveThreads(start, leftLength, levels - 1);
  
   if (*pOption == WAIT_JOIN) { 
     pthread_join(right, NULL);
@@ -460,7 +460,7 @@ void recursiveThreads(int start, int length, int levels) {
 
 // concurrent quick sort using pthreads 
 void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
-  PRINTF(("start array:")); printArray(pA, pn);
+  //PRINTF(("start array:")); printArray(pA, pn);
 
   pOption = malloc(sizeof(enum WaitMechanismType));
   *pOption = pWaitMech;
@@ -498,6 +498,6 @@ void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
   free(pOption);
   free(locks);
 
-  PRINTF(("end array:")); printArray(pA, pn);
+  //PRINTF(("end array:")); printArray(pA, pn);
 } //quickThread()
 
