@@ -17,16 +17,16 @@
    needed in order to send the data from the child processes to the 
    parents. 
 
-   In order to do this, I simply continued to poll the recv method
-   until the required amount was read, and similarly sent the data
-   in MAXBUF increments until everything was sent.
+   In order to do this, I simply add MSG_WAITALL to the recv flag, so
+   it only terminates after it has read up to the expected number of
+   bytes instead of exiting early.
 
 2) For p(4):
    quicksort -p 8000000 4:      0.348390s
-   quicksort -s 8000000 4:      2.173409s
-   quicksort -t -v 0 8000000 4: 0.308456s
-   quicksort -t -v 1 8000000 4: 0.308144s 
-   quicksort -t -v 2 8000000 4: 0.307610s 
+   quicksort -s 8000000 4:      0.335878s
+   quicksort-nomc -t -v 0 8000000 4: 0.308456s
+   quicksort-nomc -t -v 1 8000000 4: 0.308144s 
+   quicksort-nomc -t -v 2 8000000 4: 0.307610s 
 
    The quickThread implementation is undoubtedly the fastest version
    of the quicksort. This is likely due to the use of shared memory
@@ -36,19 +36,16 @@
    For p(1):
    quicksort -p 8000000 1:      0.839866s
    quicksort -s 8000000 1:      0.838132s
-   quicksort -t -v 0 8000000 1: 0.832589s
-   quicksort -t -v 1 8000000 1: 0.837366s 
-   quicksort -t -v 2 8000000 1: 0.839159s
+   quicksort-nomc -t -v 0 8000000 1: 0.832589s
+   quicksort-nomc -t -v 1 8000000 1: 0.837366s 
+   quicksort-nomc -t -v 2 8000000 1: 0.839159s
 
    As expected, the sorts for all variant are similar at p = 1, due
    to the lack of pipes, sockets, and threads utilised, so they are
    effectively running the same algorithm.
 
    The theorectical speedup of 4x by using p = 4 is not seen; the data
-   shows a maximum improvement of just over 2x for most, and in fact
-   a deterimental effect for sockets, due to the continuous polling
-   of the data in order to work around the max buffer (there is likely
-   a better implementation for sockets).
+   shows a maximum improvement of just over 2x for most.
 
    We can attribute the fact that it has not achieved a 4x improvement
    as expected to context switching between the processes, since on 

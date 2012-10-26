@@ -65,7 +65,8 @@ int* recurse(int A[], int n, int levels) {
 
       //store length
       childLength[i] = rightLength;
-      PRINTF(("%d: childLength[%d] assigned with %d\n", getpid(), i, rightLength));
+      PRINTF(("%d: childLength[%d] assigned with %d\n", getpid(), i, 
+			rightLength));
       
       //fork
       int forkId = fork();
@@ -80,13 +81,11 @@ int* recurse(int A[], int n, int levels) {
 	
 	      // assert that we wrote all bytes
 	      assert (nbytes == rightLength * sizeof(int));
-        PRINTF(("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))));
-	      PRINTF(("%d: child terminating\n", getpid()));
+        PRINTF(("%d: sent %d elements to parent process\n", getpid(), 
+			(int) (nbytes/sizeof(int))));
+	PRINTF(("%d: child terminating\n", getpid()));
         exit(0);
 
-      } else {
-        // parent debugging:
-	      //PRINTF(("%d: forked child with pid %d\n", getpid(), forkId));
       }
 
       n = leftLength;
@@ -104,7 +103,8 @@ int* recurse(int A[], int n, int levels) {
       close(pipesToRead[i]);
       // assert that we recieve the amount expected
       assert(nbytes == childLength[i] * sizeof(int));
-      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i));
+      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), 
+			(int) (nbytes/sizeof(int)), i));
 
       //increment acc
       acc += childLength[i];
@@ -183,7 +183,8 @@ int* recurseSockets(int A[], int n, int levels) {
         perror("Server get port number");
         exit(-1);
       }
-      PRINTF(("The assigned server port number is %d\n", ntohs(server.sin_port)));
+      PRINTF(("The assigned server port number is %d\n", 
+			ntohs(server.sin_port)));
       
       int portNumber = ntohs(server.sin_port);
     
@@ -196,7 +197,8 @@ int* recurseSockets(int A[], int n, int levels) {
 
       //store length
       childLength[i] = rightLength;
-      PRINTF(("%d: childLength[%d] assigned with %d\n", getpid(), i, rightLength));
+      PRINTF(("%d: childLength[%d] assigned with %d\n", getpid(), i, 
+			rightLength));
       
       //fork
       int forkId = fork();
@@ -223,7 +225,8 @@ int* recurseSockets(int A[], int n, int levels) {
         server.sin_port        = htons(portNumber);
         server.sin_addr.s_addr = INADDR_ANY; /* use any interface on this host*/
       
-        if (connect(sockConnection, (struct sockaddr *) &server, sizeof(server))) {
+        if (connect(sockConnection, (struct sockaddr *) &server, 
+		sizeof(server))) {
           perror("Client connection failure");
           exit(-1);
         }
@@ -245,8 +248,10 @@ int* recurseSockets(int A[], int n, int levels) {
 
         // assert that we wrote all bytes
         assert (nbytes == rightLength * sizeof(int));
-        PRINTF(("%d: sent %d elements to parent process\n", getpid(), (int) (nbytes/sizeof(int))));
-	      PRINTF(("%d: child terminating\n", getpid()));
+        PRINTF(("%d: sent %d elements to parent process\n", getpid(), 
+		(int) (nbytes/sizeof(int))));
+
+	PRINTF(("%d: child terminating\n", getpid()));
         exit(0);
 
       } else {
@@ -277,7 +282,8 @@ int* recurseSockets(int A[], int n, int levels) {
       /* ----now we block waiting for a connection---- */
       namelen = sizeof(client);
 
-      int sock_connection = accept(socketsToRead[i], (struct sockaddr *) &client, &namelen);
+      int sock_connection = accept(socketsToRead[i], 
+			(struct sockaddr *) &client, &namelen);
       if (sock_connection < 0) {
         perror("server accept failed");
         exit(-1);
@@ -288,15 +294,15 @@ int* recurseSockets(int A[], int n, int levels) {
             getpid(), inet_ntoa(client.sin_addr)));
       
       /* ----wait to receive some data---- */
-      int nbytes = recv(sock_connection, &A[acc], childLength[i] * sizeof(int), MSG_WAITALL);
+      int nbytes = recv(sock_connection, &A[acc], childLength[i] * sizeof(int),
+				MSG_WAITALL);
       if (nbytes < 0) {
         perror("server recv error");
         exit(-1);
       }
 
-      //PRINTF(("recievedBytes: %d, childLength * bytes: %d\n", recievedBytes, childLength[i] * sizeof(int)));
-
-      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), (int) (nbytes/sizeof(int)), i));
+      PRINTF(("%d: read %d elements from process on level %d\n", getpid(), 
+			(int) (nbytes/sizeof(int)), i));
 
       /* ----close sockets and terminate---- */
       close(sock_connection);
@@ -305,7 +311,7 @@ int* recurseSockets(int A[], int n, int levels) {
       PRINTF(("%d: server finished.\n", getpid()));
 
       // assert that we recieve the amount expected
-      //assert(recievedBytes == childLength[i] * sizeof(int));
+      assert(nbytes == childLength[i] * sizeof(int));
 
       //increment acc
       acc += childLength[i];
@@ -371,8 +377,6 @@ void* subSort(void *a) {
   }
 
   int pivot = partition(&array[start], length);
-  //PRINTF(("partition result:")); printArray(&array[start], length);
-  //PRINTF(("pivot found at %d\n", pivot));
 
   int leftLength = pivot + 1;
   int rightLength = length - leftLength;
@@ -383,18 +387,19 @@ void* subSort(void *a) {
   int threadId = threadCounter++;
   pthread_mutex_unlock(&rwLock);
 
+  // create thread with args
   struct quickArgs args = {start + leftLength, rightLength, levels - 1, threadId};
   pthread_create(&right, 0, subSort, &args);
 
+  // recurse
   recursiveThreads(start, leftLength, levels - 1);
 
+  // run synchronisation implementations
   if (*pOption == WAIT_JOIN) { 
     pthread_join(right, NULL);
   } else if(*pOption == WAIT_MUTEX) {
     pthread_mutex_lock(&locks[threadId]);
-    PRINTF(("trying to unlock myId %d\n", myId));
     pthread_mutex_unlock(&locks[myId]);
-    PRINTF(("unlocked myId %d\n", myId));
   } else if (*pOption == WAIT_MEMLOC) {
     while(p_memlocks[threadId] != 0);
     p_memlocks[myId] = 0;
@@ -411,13 +416,10 @@ void recursiveThreads(int start, int length, int levels) {
   // if no threads, then just sort.
   if(levels == 0) {
     quickSort(&array[start], length);
-    //PRINTF(("quickSorted array of length %d:", length)); printArray(&array[start], length);
     return;
   }
 
   int pivot = partition(&array[start], length);
-  //PRINTF(("partition result:")); printArray(&array[start], length);
-  //PRINTF(("pivot found at %d\n", pivot));
 
   int leftLength = pivot + 1;
   int rightLength = length - leftLength;
@@ -429,9 +431,11 @@ void recursiveThreads(int start, int length, int levels) {
   int threadId = threadCounter++;
   pthread_mutex_unlock(&rwLock);
 
+  // create thread with args
   struct quickArgs args = {start + leftLength, rightLength, levels - 1, threadId};
   pthread_create(&right, 0, subSort, &args);
   
+  // recurse
   recursiveThreads(start, leftLength, levels - 1);
  
   if (*pOption == WAIT_JOIN) { 
@@ -480,13 +484,17 @@ void quickThread(int *pA, int pn, int p, enum WaitMechanismType pWaitMech) {
       p_memlocks[i] = 1;
     }
 
-  } 
+  }
   
   PRINTF(("start processing!\n"));
   int levels = lg2(p);
   array = pA;
   
+  // initialise recursive method
   recursiveThreads(0, pn, levels);
+
+  // make sure we create the number of threads required (p-1)
+  assert(threadCounter == p - 1);
 
   //cleanup!
   if (*pOption == WAIT_MUTEX) {
